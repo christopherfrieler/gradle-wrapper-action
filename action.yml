@@ -1,0 +1,7 @@
+name: 'execute gradle tasks'
+description: 'Executes gradle tasks using the gradle wrapper.'
+inputs: {}
+outputs: {}
+runs:
+  using: 'node12'
+  main: 'index.js'
