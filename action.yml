@@ -1,6 +1,10 @@
 name: 'execute gradle tasks'
 description: 'Executes gradle tasks using the gradle wrapper.'
-inputs: {}
+inputs:
+  arguments:
+    description: 'arguments for the gradle execution'
+    required: true
+    default: 'tasks'
 outputs: {}
 runs:
   using: 'node12'
