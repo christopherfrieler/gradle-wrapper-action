@@ -21,6 +21,8 @@
   "scripts": {},
   "dependencies": {
     "@actions/core": "1.2",
-    "@actions/exec": "1.0"
+    "@actions/exec": "1.0",
+    "@actions/artifact": "0.5",
+    "@actions/glob": "0.1"
   }
 }

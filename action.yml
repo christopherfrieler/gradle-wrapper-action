@@ -5,6 +5,9 @@ inputs:
     description: 'arguments for the gradle execution'
     required: true
     default: 'tasks'
+  artifacts:
+    description: 'artifacts to upload, accepts one artifact as "<name> <path>" per line'
+    required: false
 outputs: {}
 runs:
   using: 'node12'
