@@ -4,7 +4,11 @@ inputs:
   arguments:
     description: 'arguments for the gradle execution'
     required: true
-    default: 'tasks'
+    default: tasks
+  gradle_dist_cache_key:
+    description: 'cache-key for the gradle-distribution, usually some sort of hash of the gradle-wrapper.properties file'
+    required: true
+    default: gradle-dists-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties') }}
   artifacts:
     description: 'artifacts to upload, accepts one artifact as "<name> <path>" per line'
     required: false
@@ -12,3 +16,5 @@ outputs: {}
 runs:
   using: 'node12'
   main: 'index.js'
+  post: 'post.js'
+  post-if: 'success()'

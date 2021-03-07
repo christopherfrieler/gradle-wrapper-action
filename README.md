@@ -3,6 +3,7 @@
 A [GitHub Action](https://docs.github.com/en/actions) to execute [Gradle](https://gradle.org/) tasks with the [Gradle Wrapper](https://docs.gradle.org/current/userguide/gradle_wrapper.html).
 
 The action also implements some work usually done together with a gradle execution in a GitHub Actions workflow:
+- caching the gradle distribution and project dependencies
 - uploading build-artifacts
 
 ## Usage
@@ -12,6 +13,10 @@ The action also implements some work usually done together with a gradle executi
 #### `arguments`
 
 **Required** Arguments for the gradle execution, usually tasks and further settings. Default `"tasks"`.
+
+#### `gradle_dist_cache_key`
+
+**Required** Cache-key for the gradle-distribution, usually some sort of hash of the gradle-wrapper.properties file. Default `gradle-dists-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties') }}`.
 
 #### `artifacts`
 

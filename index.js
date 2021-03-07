@@ -1,10 +1,18 @@
 const core = require('@actions/core');
 const exec = require('@actions/exec');
+const cache = require('@actions/cache');
 const artifact = require('@actions/artifact');
 const glob = require('@actions/glob');
 
 async function run() {
     try {
+        const gradleDistributionCacheKey = core.getInput('gradle_dist_cache_key', { required: true })
+        const gradleDistributionCachePaths = ['~/.gradle/wrapper/dists']
+        const restoredCacheKey = await cache.restoreCache(gradleDistributionCachePaths, gradleDistributionCacheKey);
+        if (restoredCacheKey !== gradleDistributionCacheKey) {
+            core.saveState('gradleDistributionCacheKeyToSave', gradleDistributionCacheKey);
+        }
+
         await exec.exec('chmod +x gradlew');
 
         const gradleArguments = core.getInput('arguments', { required: true }).replace(/\n/g, " ");
