@@ -18,6 +18,10 @@ The action also implements some work usually done together with a gradle executi
 
 **Required** Cache-key for the gradle-distribution, usually some sort of hash of the gradle-wrapper.properties file. Default `gradle-dists-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties') }}`.
 
+#### `gradle_deps_cache_key`
+
+**Required** Cache-key for gradle dependencies, usually some sort of hash of the .gradle-files. Default `gradle-deps-${{ hashFiles('**/*.gradle*') }}`.
+
 #### `artifacts`
 
 Optional artifacts to upload after the gradle execution.

@@ -8,9 +8,17 @@ async function run() {
     try {
         const gradleDistributionCacheKey = core.getInput('gradle_dist_cache_key', { required: true })
         const gradleDistributionCachePaths = ['~/.gradle/wrapper/dists']
-        const restoredCacheKey = await cache.restoreCache(gradleDistributionCachePaths, gradleDistributionCacheKey);
-        if (restoredCacheKey !== gradleDistributionCacheKey) {
+        const restoredGradleDistributionCacheKey = await cache.restoreCache(gradleDistributionCachePaths, gradleDistributionCacheKey);
+        if (restoredGradleDistributionCacheKey !== gradleDistributionCacheKey) {
             core.saveState('gradleDistributionCacheKeyToSave', gradleDistributionCacheKey);
+        }
+
+        const gradleDependenciesCacheKey = core.getInput('gradle_deps_cache_key', { required: true })
+        const gradleDependenciesRestoreCacheKeys = ['gradle-deps-']
+        const gradleDependenciesCachePaths = ['~/.gradle/caches/modules-2']
+        const restoredGradleDependenciesCacheKey = await cache.restoreCache(gradleDependenciesCachePaths, gradleDependenciesCacheKey, gradleDependenciesRestoreCacheKeys);
+        if (restoredGradleDependenciesCacheKey !== gradleDependenciesCacheKey) {
+            core.saveState('gradleDependenciesCacheKeyToSave', gradleDependenciesCacheKey);
         }
 
         await exec.exec('chmod +x gradlew');

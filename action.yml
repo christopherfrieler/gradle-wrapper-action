@@ -9,6 +9,10 @@ inputs:
     description: 'cache-key for the gradle-distribution, usually some sort of hash of the gradle-wrapper.properties file'
     required: true
     default: gradle-dists-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties') }}
+  gradle_deps_cache_key:
+    description: 'cache-key for gradle dependencies, usually some sort of hash of the .gradle-files'
+    required: true
+    default: gradle-deps-${{ hashFiles('**/*.gradle*') }}
   artifacts:
     description: 'artifacts to upload, accepts one artifact as "<name> <path>" per line'
     required: false
