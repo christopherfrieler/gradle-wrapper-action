@@ -1,6 +1,6 @@
 {
   "name": "gradle-wrapper-action",
-  "version": "0.2.0",
+  "version": "0.1.1",
   "description": "A GitHub Action to execute Gradle tasks with the Gradle Wrapper.",
   "author": "Christopher Frieler",
   "keywords": [
