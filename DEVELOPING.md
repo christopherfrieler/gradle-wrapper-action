@@ -5,7 +5,7 @@ For a brief introduction have a look at [Creating a JavaScript action](https://d
 
 ## Project Requirements
 
-The project requires [Node.js](https://nodejs.org/en/) 16, which includes npm.
+The project requires [Node.js](https://nodejs.org/en/) 20, which includes npm.
 
 ## Project Dependencies
 
