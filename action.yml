@@ -12,7 +12,7 @@ inputs:
   gradle_deps_cache_key:
     description: 'cache-key for gradle dependencies, usually some sort of hash of the .gradle-files'
     required: true
-    default: gradle-deps-${{ hashFiles('**/*.gradle*') }}
+    default: gradle-deps-${{ hashFiles('**/*.gradle*', 'gradle/libs.versions.toml') }}
   artifacts:
     description: 'artifacts to upload, accepts one artifact as "<name> <path>" per line'
     required: false
