@@ -20,12 +20,12 @@ The action also implements some work usually done together with a gradle executi
 
 #### `gradle_deps_cache_key`
 
-**Required** Cache-key for gradle dependencies, usually some sort of hash of the .gradle-files. Default `gradle-deps-${{ hashFiles('**/*.gradle*') }}`.
+**Required** Cache-key for gradle dependencies, usually some sort of hash of the .gradle-files. Default `gradle-deps-${{ hashFiles('**/*.gradle*', 'gradle/libs.versions.toml') }}`.
 
 #### `artifacts`
 
 Optional artifacts to upload after the gradle execution.
-Artifacts are specified as a name and path separated by a space character, where the path can be a [glob pattern](https://github.com/actions/toolkit/tree/main/packages/glob#patterns).
+Artifacts are specified as a name and one or more paths separated by space characters, where each path can be a [glob pattern](https://github.com/actions/toolkit/tree/main/packages/glob#patterns).
 You can specify multiple artifacts declaring one per line. 
 
 ### Example
