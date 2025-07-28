@@ -14,7 +14,7 @@ inputs:
     required: true
     default: gradle-deps-${{ hashFiles('**/*.gradle*', 'gradle/libs.versions.toml') }}
   artifacts:
-    description: 'artifacts to upload, accepts one artifact as "<name> <path>" per line'
+    description: 'artifacts to upload, accepts one artifact as "<name> <path> <another path> ..." per line'
     required: false
 outputs: {}
 runs:

@@ -31,9 +31,9 @@ async function run() {
             if (artifacts) {
                 const artifactClient = artifact.default
                 for (const artifact of artifacts.split("\n")) {
-                    const artifactDeclaration = artifact.split(" ", 2);
+                    const artifactDeclaration = artifact.split(" ");
                     const artifactName = artifactDeclaration[0];
-                    const artifactPathGlobber = await glob.create(artifactDeclaration[1]);
+                    const artifactPathGlobber = await glob.create(artifactDeclaration.slice(1).join("\n"));
                     const artifactPath = await artifactPathGlobber.glob()
                     await artifactClient.uploadArtifact(artifactName, artifactPath, '.', {})
                 }
