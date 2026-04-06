@@ -14,7 +14,8 @@ async function run() {
             core.saveState('gradleDistributionCacheKeyToSave', gradleDistributionCacheKey);
         }
 
-        const gradleDependenciesCacheKey = core.getInput('gradle_deps_cache_key', { required: true })
+        const gradleDependenciesSpecFiles= core.getInput('gradle_deps_spec_files', { required: true })
+        const gradleDependenciesCacheKey = `gradle-deps-${await glob.hashFiles(gradleDependenciesSpecFiles.replace(',', '\n'))}`
         const gradleDependenciesRestoreCacheKeys = ['gradle-deps-']
         const gradleDependenciesCachePaths = ['~/.gradle/caches/modules-2']
         const restoredGradleDependenciesCacheKey = await cache.restoreCache(gradleDependenciesCachePaths, gradleDependenciesCacheKey, gradleDependenciesRestoreCacheKeys);
