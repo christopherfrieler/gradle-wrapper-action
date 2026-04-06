@@ -2,8 +2,8 @@
 
 A [GitHub Action](https://docs.github.com/en/actions) to execute [Gradle](https://gradle.org/) tasks with the [Gradle Wrapper](https://docs.gradle.org/current/userguide/gradle_wrapper.html).
 
-The action also implements some work usually done together with a gradle execution in a GitHub Actions workflow:
-- caching the gradle distribution and project dependencies
+The action also implements some work usually done together with a Gradle execution in a GitHub Actions workflow:
+- caching the Gradle distribution and project dependencies
 - uploading build-artifacts
 
 ## Usage
@@ -17,7 +17,7 @@ Default `'.'`.
 
 #### `arguments`
 
-**Required** Arguments for the gradle execution, usually tasks and further settings. Default `"tasks"`.
+**Required** Arguments for the Gradle execution, usually tasks and further settings. Default `"tasks"`.
 
 #### `gradle_dist_spec_files`
 
@@ -33,14 +33,14 @@ Default `'**/*.gradle*,gradle/libs.versions.toml'`.
 
 #### `artifacts`
 
-Optional artifacts to upload after the gradle execution.
+Optional artifacts to upload after the Gradle execution.
 Artifacts are specified as a name and one or more paths separated by space characters, where each path can be a [glob pattern](https://github.com/actions/toolkit/tree/main/packages/glob#patterns).
 You can specify multiple artifacts declaring one per line. 
 
 ### Example
 
 ```yaml
-- uses: actions/setup-java@v1  # setup java for gradle execution
+- uses: actions/setup-java@v5  # setup java for Gradle execution
 - name: gradle execution  
   uses: christopherfrieler/gradle-wrapper-action@v0.6.0
   with:
@@ -50,6 +50,6 @@ You can specify multiple artifacts declaring one per line.
 ```
 
 ## Contributing and Developing
-If you have an idea, problem or question about the gradle-wrapper-action you can open an [issue](https://github.com/christopherfrieler/gradle-wrapper-action/issues).
+If you have an idea, problem or question about the gradle-wrapper-action, you can open an [issue](https://github.com/christopherfrieler/gradle-wrapper-action/issues).
 
-If you want to clone the repository and work on the code have a look at the [DEVELOPING.md](https://github.com/christopherfrieler/gradle-wrapper-action/blob/master/DEVELOPING.md).
+If you want to clone the repository and work on the code, have a look at the [DEVELOPING.md](./DEVELOPING.md).
