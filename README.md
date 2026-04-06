@@ -10,17 +10,26 @@ The action also implements some work usually done together with a gradle executi
 
 ### Inputs
 
+#### `gradle_project_root`
+
+**Required** The root directory of the Gradle project.
+Default `'.'`.
+
 #### `arguments`
 
 **Required** Arguments for the gradle execution, usually tasks and further settings. Default `"tasks"`.
 
-#### `gradle_dist_cache_key`
+#### `gradle_dist_spec_files`
 
-**Required** Cache-key for the gradle-distribution, usually some sort of hash of the gradle-wrapper.properties file. Default `gradle-dists-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties') }}`.
+**Required** File paths that specify the Gradle distribution in use to cache it.
+Supports [glob patterns](https://github.com/actions/toolkit/tree/main/packages/glob#patterns) and multiple files or patterns as a comma-separated list.
+Default `'gradle/wrapper/gradle-wrapper.properties'`.
 
-#### `gradle_deps_cache_key`
+#### `gradle_deps_spec_files`
 
-**Required** Cache-key for gradle dependencies, usually some sort of hash of the .gradle-files. Default `gradle-deps-${{ hashFiles('**/*.gradle*', 'gradle/libs.versions.toml') }}`.
+**Required** File paths that specify Gradle project dependencies to cache them.
+Supports [glob patterns](https://github.com/actions/toolkit/tree/main/packages/glob#patterns) and multiple files or patterns as a comma-separated list.
+Default `'**/*.gradle*,gradle/libs.versions.toml'`.
 
 #### `artifacts`
 
