@@ -5,10 +5,10 @@ inputs:
     description: 'arguments for the gradle execution'
     required: true
     default: tasks
-  gradle_dist_cache_key:
-    description: 'cache-key for the gradle-distribution, usually some sort of hash of the gradle-wrapper.properties file'
+  gradle_dist_spec_files:
+    description: 'file paths that specify the Gradle distribution in use to cache it, usually gradle-wrapper.properties'
     required: true
-    default: gradle-dists-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties') }}
+    default: 'gradle/wrapper/gradle-wrapper.properties'
   gradle_deps_cache_key:
     description: 'cache-key for gradle dependencies, usually some sort of hash of the .gradle-files'
     required: true

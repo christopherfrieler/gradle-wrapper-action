@@ -6,7 +6,8 @@ const glob = require('@actions/glob');
 
 async function run() {
     try {
-        const gradleDistributionCacheKey = core.getInput('gradle_dist_cache_key', { required: true })
+        const gradleDistributionSpecFiles = core.getInput('gradle_dist_spec_files', { required: true })
+        const gradleDistributionCacheKey = `gradle-dists-${await glob.hashFiles(gradleDistributionSpecFiles.replace(',', '\n'))}`
         const gradleDistributionCachePaths = ['~/.gradle/wrapper/dists']
         const restoredGradleDistributionCacheKey = await cache.restoreCache(gradleDistributionCachePaths, gradleDistributionCacheKey);
         if (restoredGradleDistributionCacheKey !== gradleDistributionCacheKey) {
