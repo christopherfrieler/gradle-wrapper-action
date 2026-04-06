@@ -10,6 +10,11 @@ The action also implements some work usually done together with a gradle executi
 
 ### Inputs
 
+#### `gradle_project_root`
+
+**Required** The root directory of the Gradle project.
+Default `'.'`.
+
 #### `arguments`
 
 **Required** Arguments for the gradle execution, usually tasks and further settings. Default `"tasks"`.

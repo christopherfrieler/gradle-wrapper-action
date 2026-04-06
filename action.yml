@@ -1,6 +1,10 @@
 name: 'execute gradle tasks'
 description: 'Executes gradle tasks using the gradle wrapper.'
 inputs:
+  gradle_project_root:
+    description: 'root directory of the Gradle project'
+    required: true
+    default: '.'
   arguments:
     description: 'arguments for the gradle execution'
     required: true

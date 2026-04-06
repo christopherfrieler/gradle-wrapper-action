@@ -6,7 +6,10 @@ const glob = require('@actions/glob');
 
 async function run() {
     try {
+        const gradleProjectRoot = core.getInput('gradle_project_root', { required: true })
+
         const gradleDistributionSpecFiles = core.getInput('gradle_dist_spec_files', { required: true })
+            .split(",").map(f => `${gradleProjectRoot}/${f}`).join("\n")
         const gradleDistributionCacheKey = `gradle-dists-${await glob.hashFiles(gradleDistributionSpecFiles.replace(',', '\n'))}`
         const gradleDistributionCachePaths = ['~/.gradle/wrapper/dists']
         const restoredGradleDistributionCacheKey = await cache.restoreCache(gradleDistributionCachePaths, gradleDistributionCacheKey);
@@ -15,6 +18,7 @@ async function run() {
         }
 
         const gradleDependenciesSpecFiles= core.getInput('gradle_deps_spec_files', { required: true })
+            .split(",").map(f => `${gradleProjectRoot}/${f}`).join("\n")
         const gradleDependenciesCacheKey = `gradle-deps-${await glob.hashFiles(gradleDependenciesSpecFiles.replace(',', '\n'))}`
         const gradleDependenciesRestoreCacheKeys = ['gradle-deps-']
         const gradleDependenciesCachePaths = ['~/.gradle/caches/modules-2']
@@ -23,11 +27,12 @@ async function run() {
             core.saveState('gradleDependenciesCacheKeyToSave', gradleDependenciesCacheKey);
         }
 
-        await exec.exec('chmod +x gradlew');
+        await exec.exec('chmod +x gradlew', [], { cwd: gradleProjectRoot })
 
         try {
             const gradleArguments = core.getInput('arguments', { required: true }).replace(/\n/g, " ");
-            await exec.exec(`./gradlew --no-daemon --stacktrace ${gradleArguments}`);
+            await exec.exec(`./gradlew --no-daemon --stacktrace ${gradleArguments}`, [], { cwd: gradleProjectRoot })
+
         } finally {
             const artifacts = core.getInput("artifacts")
             if (artifacts) {
@@ -35,7 +40,7 @@ async function run() {
                 for (const artifact of artifacts.split("\n")) {
                     const artifactDeclaration = artifact.split(" ");
                     const artifactName = artifactDeclaration[0];
-                    const artifactPathGlobber = await glob.create(artifactDeclaration.slice(1).join("\n"));
+                    const artifactPathGlobber = await glob.create(artifactDeclaration.slice(1).map(f => `${gradleProjectRoot}/${f}`).join("\n"))
                     const artifactPath = await artifactPathGlobber.glob()
                     await artifactClient.uploadArtifact(artifactName, artifactPath, '.', {})
                 }
