@@ -1,0 +1,16 @@
+name: Continuous Integration
+on: [ push, pull_request ]
+
+jobs:
+  test-action:
+    name: Test gradle-wrapper action
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '25'
+      - uses: ./
+        with:
+          gradle_project_root: integration-tests
