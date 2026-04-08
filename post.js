@@ -1,5 +1,5 @@
-const core = require('@actions/core');
-const cache = require('@actions/cache');
+const core = await import('@actions/core')
+const cache = await import('@actions/cache')
 
 async function run() {
     try {

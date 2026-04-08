@@ -1,8 +1,8 @@
-const core = require('@actions/core');
-const exec = require('@actions/exec');
-const cache = require('@actions/cache');
-const artifact = require('@actions/artifact');
-const glob = require('@actions/glob');
+const core = await import('@actions/core')
+const exec = await import('@actions/exec')
+const cache = await import('@actions/cache')
+const artifact = await import('@actions/artifact')
+const glob = await import('@actions/glob')
 
 async function run() {
     try {
