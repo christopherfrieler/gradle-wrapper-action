@@ -42,7 +42,7 @@ You can specify multiple artifacts declaring one per line.
 ```yaml
 - uses: actions/setup-java@v5  # setup java for Gradle execution
 - name: gradle execution  
-  uses: christopherfrieler/gradle-wrapper-action@v0.6.0
+  uses: christopherfrieler/gradle-wrapper-action@v0.7.0
   with:
     arguments: 'build --info'
     artifacts: |
