@@ -17,16 +17,17 @@
   "bugs": {
     "url": "https://github.com/christopherfrieler/gradle-wrapper-action/issues"
   },
+  "type": "module",
   "main": "index.js",
   "scripts": {},
   "engines": {
-    "node": "20"
+    "node": "24"
   },
   "dependencies": {
-    "@actions/core": "1.11",
-    "@actions/exec": "1.1",
-    "@actions/artifact": "2.3",
-    "@actions/glob": "0.5",
-    "@actions/cache": "4.0"
+    "@actions/core": "3.0",
+    "@actions/exec": "3.0",
+    "@actions/artifact": "6.2",
+    "@actions/glob": "0.6",
+    "@actions/cache": "6.0"
   }
 }
