@@ -189,177 +189,81 @@ export interface MatcherSnapshot {
 }
 
 /**
- * ReadOnlyMatcher - A safe, read-only view over a {@link Matcher} instance.
+ * MatcherView - A lightweight read-only view over a {@link Matcher} instance.
  *
- * Returned by {@link Matcher.readOnly}. Exposes all query and inspection
- * methods but **throws a `TypeError`** if any state-mutating method is called
- * (`push`, `pop`, `reset`, `updateCurrent`, `restore`).  Direct property
- * writes are also blocked.
+ * Created once by {@link Matcher} and reused across all callbacks — no allocation
+ * on every invocation. Holds a direct reference to the parent Matcher's internal
+ * state so it always reflects the current parser position with zero copying or
+ * freezing overhead.
  *
- * Pass this to consumers that only need to inspect or match the current path
- * so they cannot accidentally corrupt the parser state.
+ * Mutation methods (`push`, `pop`, `reset`, `updateCurrent`, `restore`) are simply
+ * absent from this class, so misuse is caught at compile time by TypeScript rather
+ * than at runtime.
+ *
+ * Obtain via {@link Matcher#readOnly} — the same instance is returned every time.
  *
  * @example
  * ```typescript
  * const matcher = new Matcher();
+ * const view: MatcherView = matcher.readOnly();
+ *
  * matcher.push("root", {});
  * matcher.push("users", {});
  * matcher.push("user", { id: "123" });
  *
- * const ro: ReadOnlyMatcher = matcher.readOnly();
- *
- * ro.matches(expr);      // ✓ works
- * ro.getCurrentTag();    // ✓ "user"
- * ro.getDepth();         // ✓ 3
- * ro.push("child", {}); // ✗ TypeError: Cannot call 'push' on a read-only Matcher
- * ro.reset();            // ✗ TypeError: Cannot call 'reset' on a read-only Matcher
+ * view.matches(expr);      // ✓ true
+ * view.getCurrentTag();    // ✓ "user"
+ * view.getDepth();         // ✓ 3
+ * // view.push(...)        // ✗ Property 'push' does not exist on type 'MatcherView'
  * ```
  */
-export interface ReadOnlyMatcher {
+export class MatcherView {
   /**
-   * Default path separator (read-only)
+   * Default path separator (read-only, delegates to parent Matcher)
    */
   readonly separator: string;
 
-  /**
-   * Current path stack (each node is a frozen copy)
-   */
-  readonly path: ReadonlyArray<Readonly<PathNode>>;
-
-  // ── Query methods ───────────────────────────────────────────────────────────
-
-  /**
-   * Get current tag name
-   * @returns Current tag name or undefined if path is empty
-   */
   getCurrentTag(): string | undefined;
-
-  /**
-   * Get current namespace
-   * @returns Current namespace or undefined if not present or path is empty
-   */
   getCurrentNamespace(): string | undefined;
-
-  /**
-   * Get current node's attribute value
-   * @param attrName - Attribute name
-   * @returns Attribute value or undefined
-   */
   getAttrValue(attrName: string): any;
-
-  /**
-   * Check if current node has an attribute
-   * @param attrName - Attribute name
-   */
   hasAttr(attrName: string): boolean;
-
-  /**
-   * Get current node's sibling position (child index in parent)
-   * @returns Position index or -1 if path is empty
-   */
   getPosition(): number;
-
-  /**
-   * Get current node's repeat counter (occurrence count of this tag name)
-   * @returns Counter value or -1 if path is empty
-   */
   getCounter(): number;
-
-  /**
-   * Get current node's sibling index (alias for getPosition for backward compatibility)
-   * @returns Index or -1 if path is empty
-   * @deprecated Use getPosition() or getCounter() instead
-   */
+  /** @deprecated Use getPosition() or getCounter() instead */
   getIndex(): number;
-
-  /**
-   * Get current path depth
-   * @returns Number of nodes in the path
-   */
   getDepth(): number;
-
-  /**
-   * Get path as string
-   * @param separator - Optional separator (uses default if not provided)
-   * @param includeNamespace - Whether to include namespace in output
-   * @returns Path string (e.g., "root.users.user" or "ns:root.ns:users.user")
-   */
   toString(separator?: string, includeNamespace?: boolean): string;
-
-  /**
-   * Get path as array of tag names
-   * @returns Array of tag names
-   */
   toArray(): string[];
-
-  /**
-   * Match current path against an Expression
-   * @param expression - The expression to match against
-   * @returns True if current path matches the expression
-   */
   matches(expression: Expression): boolean;
-
-  /**
- * Test whether the matcher's current path matches **any** expression in the set.
- *
- * @param exprSet - A `ExpressionSet` instance
- * @returns `true` if at least one expression matches the current path
- */
   matchesAny(exprSet: ExpressionSet): boolean;
-
-  /**
-   * Create a snapshot of current state
-   * @returns State snapshot that can be restored later
-   */
-  snapshot(): MatcherSnapshot;
-
-  // ── Blocked mutating methods ────────────────────────────────────────────────
-  // These are present in the type so callers get a compile-time error with a
-  // helpful message instead of a silent "property does not exist" error.
-
-  /**
-   * @throws {TypeError} Always – mutation is not allowed on a read-only view.
-   */
-  push(tagName: string, attrValues?: Record<string, any> | null, namespace?: string | null): never;
-
-  /**
-   * @throws {TypeError} Always – mutation is not allowed on a read-only view.
-   */
-  pop(): never;
-
-  /**
-   * @throws {TypeError} Always – mutation is not allowed on a read-only view.
-   */
-  updateCurrent(attrValues: Record<string, any>): never;
-
-  /**
-   * @throws {TypeError} Always – mutation is not allowed on a read-only view.
-   */
-  reset(): never;
-
-  /**
-   * @throws {TypeError} Always – mutation is not allowed on a read-only view.
-   */
-  restore(snapshot: MatcherSnapshot): never;
 }
 
 /**
- * Matcher - Tracks current path in XML/JSON tree and matches against Expressions
- * 
+ * @deprecated Use {@link MatcherView} instead.
+ * Alias kept for backward compatibility with code that references `ReadOnlyMatcher`.
+ */
+export type ReadOnlyMatcher = MatcherView;
+
+/**
+ * Matcher - Tracks current path in XML/JSON tree and matches against Expressions.
+ *
  * The matcher maintains a stack of nodes representing the current path from root to
  * current tag. It only stores attribute values for the current (top) node to minimize
  * memory usage.
- * 
+ *
+ * Use {@link Matcher#readOnly} to obtain a {@link MatcherView} safe to pass to
+ * user callbacks — the same instance is reused on every call with no allocation overhead.
+ *
  * @example
  * ```typescript
  * const matcher = new Matcher();
  * matcher.push("root", {});
  * matcher.push("users", {});
  * matcher.push("user", { id: "123", type: "admin" });
- * 
+ *
  * const expr = new Expression("root.users.user");
  * matcher.matches(expr); // true
- * 
+ *
  * matcher.pop();
  * matcher.matches(expr); // false
  * ```
@@ -371,22 +275,17 @@ export class Matcher {
   readonly separator: string;
 
   /**
-   * Current path stack
-   */
-  readonly path: PathNode[];
-
-  /**
    * Create a new Matcher
    * @param options - Configuration options
    */
   constructor(options?: MatcherOptions);
 
   /**
-   * Push a new tag onto the path
+   * Push a new tag onto the path.
    * @param tagName - Name of the tag
    * @param attrValues - Attribute key-value pairs for current node (optional)
    * @param namespace - Namespace for the tag (optional)
-   * 
+   *
    * @example
    * ```typescript
    * matcher.push("user", { id: "123", type: "admin" });
@@ -397,146 +296,63 @@ export class Matcher {
   push(tagName: string, attrValues?: Record<string, any> | null, namespace?: string | null): void;
 
   /**
-   * Pop the last tag from the path
+   * Pop the last tag from the path.
    * @returns The popped node or undefined if path is empty
    */
   pop(): PathNode | undefined;
 
   /**
-   * Update current node's attribute values
-   * Useful when attributes are parsed after push
+   * Update current node's attribute values.
+   * Useful when attributes are parsed after push.
    * @param attrValues - Attribute values
    */
   updateCurrent(attrValues: Record<string, any>): void;
 
   /**
-   * Get current tag name
-   * @returns Current tag name or undefined if path is empty
-   */
-  getCurrentTag(): string | undefined;
-
-  /**
-   * Get current namespace
-   * @returns Current namespace or undefined if not present or path is empty
-   */
-  getCurrentNamespace(): string | undefined;
-
-  /**
-   * Get current node's attribute value
-   * @param attrName - Attribute name
-   * @returns Attribute value or undefined
-   */
-  getAttrValue(attrName: string): any;
-
-  /**
-   * Check if current node has an attribute
-   * @param attrName - Attribute name
-   */
-  hasAttr(attrName: string): boolean;
-
-  /**
-   * Get current node's sibling position (child index in parent)
-   * @returns Position index or -1 if path is empty
-   */
-  getPosition(): number;
-
-  /**
-   * Get current node's repeat counter (occurrence count of this tag name)
-   * @returns Counter value or -1 if path is empty
-   */
-  getCounter(): number;
-
-  /**
-   * Get current node's sibling index (alias for getPosition for backward compatibility)
-   * @returns Index or -1 if path is empty
-   * @deprecated Use getPosition() or getCounter() instead
-   */
-  getIndex(): number;
-
-  /**
-   * Get current path depth
-   * @returns Number of nodes in the path
-   */
-  getDepth(): number;
-
-  /**
-   * Get path as string
-   * @param separator - Optional separator (uses default if not provided)
-   * @param includeNamespace - Whether to include namespace in output
-   * @returns Path string (e.g., "root.users.user" or "ns:root.ns:users.user")
-   */
-  toString(separator?: string, includeNamespace?: boolean): string;
-
-  /**
-   * Get path as array of tag names
-   * @returns Array of tag names
-   */
-  toArray(): string[];
-
-  /**
-   * Reset the path to empty
+   * Reset the path to empty.
    */
   reset(): void;
 
   /**
-   * Match current path against an Expression
-   * @param expression - The expression to match against
-   * @returns True if current path matches the expression
-   * 
-   * @example
-   * ```typescript
-   * const expr = new Expression("root.users.user[id]");
-   * const matcher = new Matcher();
-   * 
-   * matcher.push("root");
-   * matcher.push("users");
-   * matcher.push("user", { id: "123" });
-   * 
-   * matcher.matches(expr); // true
-   * ```
-   */
-  matches(expression: Expression): boolean;
-
-  /**
- * Test whether the matcher's current path matches **any** expression in the set.
- *
- * Uses the pre-built index to evaluate only the relevant bucket(s):
- *  1. Exact depth + tag — O(1) lookup
- *  2. Depth-matched wildcard tag — O(1) lookup
- *  3. Deep-wildcard expressions — always scanned (typically a small list)
- *
- * @param exprSet - A `ExpressionSet` instance
- * @returns `true` if at least one expression matches the current path
- *
- * @example
- * ```typescript
- * // Replaces:
- * // for (const expr of stopNodeExpressions) {
- * //   if (matcher.matches(expr)) return true;
- * // }
- *
- * if (matcher.matchesAny(stopNodes)) {
- *   // current tag is a stop node
- * }
- * ```
- */
-  matchesAny(exprSet: ExpressionSet): boolean;
-  /**
-   * Create a snapshot of current state
+   * Create a snapshot of current state.
    * @returns State snapshot that can be restored later
    */
   snapshot(): MatcherSnapshot;
 
   /**
-   * Restore state from snapshot
+   * Restore state from snapshot.
    * @param snapshot - State snapshot from previous snapshot() call
    */
   restore(snapshot: MatcherSnapshot): void;
 
+  getCurrentTag(): string | undefined;
+  getCurrentNamespace(): string | undefined;
+  getAttrValue(attrName: string): any;
+  hasAttr(attrName: string): boolean;
+  getPosition(): number;
+  getCounter(): number;
+  /** @deprecated Use getPosition() or getCounter() instead */
+  getIndex(): number;
+  getDepth(): number;
+  toString(separator?: string, includeNamespace?: boolean): string;
+  toArray(): string[];
+  matches(expression: Expression): boolean;
+  matchesAny(exprSet: ExpressionSet): boolean;
+
   /**
-   * Return a read-only view of this matcher.
+   * Return the read-only {@link MatcherView} for this matcher.
+   *
+   * The same instance is returned on every call — no allocation occurs.
+   * Pass this to user callbacks; it always reflects current parser state.
+   *
+   * @example
+   * ```typescript
+   * const view = matcher.readOnly();
+   * // same reference every time — safe to cache
+   * view === matcher.readOnly(); // true
+   * ```
    */
-  readOnly(): ReadOnlyMatcher;
+  readOnly(): MatcherView;
 }
 
 /**
@@ -673,7 +489,7 @@ export class ExpressionSet {
    * }
    * ```
    */
-  matchesAny(matcher: Matcher | ReadOnlyMatcher): boolean;
+  matchesAny(matcher: Matcher | MatcherView): boolean;
 
   /**
    * Find the first expression in the set that matches the matcher's current path.
@@ -691,7 +507,7 @@ export class ExpressionSet {
    * const node = stopNodes.findMatch(matcher);
    * ```
    */
-  findMatch(matcher: Matcher | ReadOnlyMatcher): Expression;
+  findMatch(matcher: Matcher | MatcherView): Expression;
 }
 
 /**
@@ -700,6 +516,7 @@ export class ExpressionSet {
 declare const _default: {
   Expression: typeof Expression;
   Matcher: typeof Matcher;
+  MatcherView: typeof MatcherView;
   ExpressionSet: typeof ExpressionSet;
 };
 
