@@ -1,61 +1,203 @@
 import ExpressionSet from "./ExpressionSet.js";
+
 /**
- * Matcher - Tracks current path in XML/JSON tree and matches against Expressions
- * 
+ * MatcherView - A lightweight read-only view over a Matcher's internal state.
+ *
+ * Created once by Matcher and reused across all callbacks. Holds a direct
+ * reference to the parent Matcher so it always reflects current parser state
+ * with zero copying or freezing overhead.
+ *
+ * Users receive this via {@link Matcher#readOnly} or directly from parser
+ * callbacks. It exposes all query and matching methods but has no mutation
+ * methods — misuse is caught at the TypeScript level rather than at runtime.
+ *
+ * @example
+ * const matcher = new Matcher();
+ * const view = matcher.readOnly();
+ *
+ * matcher.push("root", {});
+ * view.getCurrentTag(); // "root"
+ * view.getDepth();      // 1
+ */
+export class MatcherView {
+  /**
+   * @param {Matcher} matcher - The parent Matcher instance to read from.
+   */
+  constructor(matcher) {
+    this._matcher = matcher;
+  }
+
+  /**
+   * Get the path separator used by the parent matcher.
+   * @returns {string}
+   */
+  get separator() {
+    return this._matcher.separator;
+  }
+
+  /**
+   * Get current tag name.
+   * @returns {string|undefined}
+   */
+  getCurrentTag() {
+    const path = this._matcher.path;
+    return path.length > 0 ? path[path.length - 1].tag : undefined;
+  }
+
+  /**
+   * Get current namespace.
+   * @returns {string|undefined}
+   */
+  getCurrentNamespace() {
+    const path = this._matcher.path;
+    return path.length > 0 ? path[path.length - 1].namespace : undefined;
+  }
+
+  /**
+   * Get current node's attribute value.
+   * @param {string} attrName
+   * @returns {*}
+   */
+  getAttrValue(attrName) {
+    const path = this._matcher.path;
+    if (path.length === 0) return undefined;
+    return path[path.length - 1].values?.[attrName];
+  }
+
+  /**
+   * Check if current node has an attribute.
+   * @param {string} attrName
+   * @returns {boolean}
+   */
+  hasAttr(attrName) {
+    const path = this._matcher.path;
+    if (path.length === 0) return false;
+    const current = path[path.length - 1];
+    return current.values !== undefined && attrName in current.values;
+  }
+
+  /**
+   * Get current node's sibling position (child index in parent).
+   * @returns {number}
+   */
+  getPosition() {
+    const path = this._matcher.path;
+    if (path.length === 0) return -1;
+    return path[path.length - 1].position ?? 0;
+  }
+
+  /**
+   * Get current node's repeat counter (occurrence count of this tag name).
+   * @returns {number}
+   */
+  getCounter() {
+    const path = this._matcher.path;
+    if (path.length === 0) return -1;
+    return path[path.length - 1].counter ?? 0;
+  }
+
+  /**
+   * Get current node's sibling index (alias for getPosition).
+   * @returns {number}
+   * @deprecated Use getPosition() or getCounter() instead
+   */
+  getIndex() {
+    return this.getPosition();
+  }
+
+  /**
+   * Get current path depth.
+   * @returns {number}
+   */
+  getDepth() {
+    return this._matcher.path.length;
+  }
+
+  /**
+   * Get path as string.
+   * @param {string} [separator] - Optional separator (uses default if not provided)
+   * @param {boolean} [includeNamespace=true]
+   * @returns {string}
+   */
+  toString(separator, includeNamespace = true) {
+    return this._matcher.toString(separator, includeNamespace);
+  }
+
+  /**
+   * Get path as array of tag names.
+   * @returns {string[]}
+   */
+  toArray() {
+    return this._matcher.path.map(n => n.tag);
+  }
+
+  /**
+   * Match current path against an Expression.
+   * @param {Expression} expression
+   * @returns {boolean}
+   */
+  matches(expression) {
+    return this._matcher.matches(expression);
+  }
+
+  /**
+   * Match any expression in the given set against the current path.
+   * @param {ExpressionSet} exprSet
+   * @returns {boolean}
+   */
+  matchesAny(exprSet) {
+    return exprSet.matchesAny(this._matcher);
+  }
+}
+
+/**
+ * Matcher - Tracks current path in XML/JSON tree and matches against Expressions.
+ *
  * The matcher maintains a stack of nodes representing the current path from root to
  * current tag. It only stores attribute values for the current (top) node to minimize
  * memory usage. Sibling tracking is used to auto-calculate position and counter.
- * 
+ *
+ * Use {@link Matcher#readOnly} to obtain a {@link MatcherView} safe to pass to
+ * user callbacks — it always reflects current state with no Proxy overhead.
+ *
  * @example
  * const matcher = new Matcher();
  * matcher.push("root", {});
  * matcher.push("users", {});
  * matcher.push("user", { id: "123", type: "admin" });
- * 
+ *
  * const expr = new Expression("root.users.user");
  * matcher.matches(expr); // true
  */
-
-/**
- * Names of methods that mutate Matcher state.
- * Any attempt to call these on a read-only view throws a TypeError.
- * @type {Set<string>}
- */
-const MUTATING_METHODS = new Set(['push', 'pop', 'reset', 'updateCurrent', 'restore']);
-
 export default class Matcher {
   /**
-   * Create a new Matcher
-   * @param {Object} options - Configuration options
-   * @param {string} options.separator - Default path separator (default: '.')
+   * Create a new Matcher.
+   * @param {Object} [options={}]
+   * @param {string} [options.separator='.'] - Default path separator
    */
   constructor(options = {}) {
     this.separator = options.separator || '.';
     this.path = [];
     this.siblingStacks = [];
-    // Each path node: { tag: string, values: object, position: number, counter: number }
+    // Each path node: { tag, values, position, counter, namespace? }
     // values only present for current (last) node
     // Each siblingStacks entry: Map<tagName, count> tracking occurrences at each level
     this._pathStringCache = null;
-    this._frozenPathCache = null;        // cache for readOnly().path
-    this._frozenSiblingsCache = null;   // cache for readOnly().siblingStacks
+    this._view = new MatcherView(this);
   }
 
   /**
-   * Push a new tag onto the path
-   * @param {string} tagName - Name of the tag
-   * @param {Object} attrValues - Attribute key-value pairs for current node (optional)
-   * @param {string} namespace - Namespace for the tag (optional)
+   * Push a new tag onto the path.
+   * @param {string} tagName
+   * @param {Object|null} [attrValues=null]
+   * @param {string|null} [namespace=null]
    */
   push(tagName, attrValues = null, namespace = null) {
-    //invalidate cache
     this._pathStringCache = null;
-    this._frozenPathCache = null;
-    this._frozenSiblingsCache = null;
+
     // Remove values from previous current node (now becoming ancestor)
     if (this.path.length > 0) {
-      const prev = this.path[this.path.length - 1];
-      prev.values = undefined;
+      this.path[this.path.length - 1].values = undefined;
     }
 
     // Get or create sibling tracking for current level
@@ -88,12 +230,10 @@ export default class Matcher {
       counter: counter
     };
 
-    // Store namespace if provided
     if (namespace !== null && namespace !== undefined) {
       node.namespace = namespace;
     }
 
-    // Store values only for current node
     if (attrValues !== null && attrValues !== undefined) {
       node.values = attrValues;
     }
@@ -102,20 +242,15 @@ export default class Matcher {
   }
 
   /**
-   * Pop the last tag from the path
+   * Pop the last tag from the path.
    * @returns {Object|undefined} The popped node
    */
   pop() {
     if (this.path.length === 0) return undefined;
-    //invalidate cache
     this._pathStringCache = null;
-    this._frozenPathCache = null;
-    this._frozenSiblingsCache = null;
+
     const node = this.path.pop();
 
-    // Clean up sibling tracking for levels deeper than current
-    // After pop, path.length is the new depth
-    // We need to clean up siblingStacks[path.length + 1] and beyond
     if (this.siblingStacks.length > this.path.length + 1) {
       this.siblingStacks.length = this.path.length + 1;
     }
@@ -124,22 +259,21 @@ export default class Matcher {
   }
 
   /**
-   * Update current node's attribute values
-   * Useful when attributes are parsed after push
-   * @param {Object} attrValues - Attribute values
+   * Update current node's attribute values.
+   * Useful when attributes are parsed after push.
+   * @param {Object} attrValues
    */
   updateCurrent(attrValues) {
     if (this.path.length > 0) {
       const current = this.path[this.path.length - 1];
       if (attrValues !== null && attrValues !== undefined) {
         current.values = attrValues;
-        this._frozenPathCache = null;
       }
     }
   }
 
   /**
-   * Get current tag name
+   * Get current tag name.
    * @returns {string|undefined}
    */
   getCurrentTag() {
@@ -147,7 +281,7 @@ export default class Matcher {
   }
 
   /**
-   * Get current namespace
+   * Get current namespace.
    * @returns {string|undefined}
    */
   getCurrentNamespace() {
@@ -155,19 +289,18 @@ export default class Matcher {
   }
 
   /**
-   * Get current node's attribute value
-   * @param {string} attrName - Attribute name
-   * @returns {*} Attribute value or undefined
+   * Get current node's attribute value.
+   * @param {string} attrName
+   * @returns {*}
    */
   getAttrValue(attrName) {
     if (this.path.length === 0) return undefined;
-    const current = this.path[this.path.length - 1];
-    return current.values?.[attrName];
+    return this.path[this.path.length - 1].values?.[attrName];
   }
 
   /**
-   * Check if current node has an attribute
-   * @param {string} attrName - Attribute name
+   * Check if current node has an attribute.
+   * @param {string} attrName
    * @returns {boolean}
    */
   hasAttr(attrName) {
@@ -177,7 +310,7 @@ export default class Matcher {
   }
 
   /**
-   * Get current node's sibling position (child index in parent)
+   * Get current node's sibling position (child index in parent).
    * @returns {number}
    */
   getPosition() {
@@ -186,7 +319,7 @@ export default class Matcher {
   }
 
   /**
-   * Get current node's repeat counter (occurrence count of this tag name)
+   * Get current node's repeat counter (occurrence count of this tag name).
    * @returns {number}
    */
   getCounter() {
@@ -195,7 +328,7 @@ export default class Matcher {
   }
 
   /**
-   * Get current node's sibling index (alias for getPosition for backward compatibility)
+   * Get current node's sibling index (alias for getPosition).
    * @returns {number}
    * @deprecated Use getPosition() or getCounter() instead
    */
@@ -204,7 +337,7 @@ export default class Matcher {
   }
 
   /**
-   * Get current path depth
+   * Get current path depth.
    * @returns {number}
    */
   getDepth() {
@@ -212,9 +345,9 @@ export default class Matcher {
   }
 
   /**
-   * Get path as string
-   * @param {string} separator - Optional separator (uses default if not provided)
-   * @param {boolean} includeNamespace - Whether to include namespace in output (default: true)
+   * Get path as string.
+   * @param {string} [separator] - Optional separator (uses default if not provided)
+   * @param {boolean} [includeNamespace=true]
    * @returns {string}
    */
   toString(separator, includeNamespace = true) {
@@ -222,24 +355,23 @@ export default class Matcher {
     const isDefault = (sep === this.separator && includeNamespace === true);
 
     if (isDefault) {
-      if (this._pathStringCache !== null && this._pathStringCache !== undefined) {
+      if (this._pathStringCache !== null) {
         return this._pathStringCache;
       }
       const result = this.path.map(n =>
-        (includeNamespace && n.namespace) ? `${n.namespace}:${n.tag}` : n.tag
+        (n.namespace) ? `${n.namespace}:${n.tag}` : n.tag
       ).join(sep);
       this._pathStringCache = result;
       return result;
     }
 
-    // Non-default separator or includeNamespace=false: don't cache (rare case)
     return this.path.map(n =>
       (includeNamespace && n.namespace) ? `${n.namespace}:${n.tag}` : n.tag
     ).join(sep);
   }
 
   /**
-   * Get path as array of tag names
+   * Get path as array of tag names.
    * @returns {string[]}
    */
   toArray() {
@@ -247,21 +379,18 @@ export default class Matcher {
   }
 
   /**
-   * Reset the path to empty
+   * Reset the path to empty.
    */
   reset() {
-    //invalidate cache
     this._pathStringCache = null;
-    this._frozenPathCache = null;
-    this._frozenSiblingsCache = null;
     this.path = [];
     this.siblingStacks = [];
   }
 
   /**
-   * Match current path against an Expression
-   * @param {Expression} expression - The expression to match against
-   * @returns {boolean} True if current path matches the expression
+   * Match current path against an Expression.
+   * @param {Expression} expression
+   * @returns {boolean}
    */
   matches(expression) {
     const segments = expression.segments;
@@ -270,32 +399,23 @@ export default class Matcher {
       return false;
     }
 
-    // Handle deep wildcard patterns
     if (expression.hasDeepWildcard()) {
       return this._matchWithDeepWildcard(segments);
     }
 
-    // Simple path matching (no deep wildcards)
     return this._matchSimple(segments);
   }
 
   /**
-   * Match simple path (no deep wildcards)
    * @private
    */
   _matchSimple(segments) {
-    // Path must be same length as segments
     if (this.path.length !== segments.length) {
       return false;
     }
 
-    // Match each segment bottom-to-top
     for (let i = 0; i < segments.length; i++) {
-      const segment = segments[i];
-      const node = this.path[i];
-      const isCurrentNode = (i === this.path.length - 1);
-
-      if (!this._matchSegment(segment, node, isCurrentNode)) {
+      if (!this._matchSegment(segments[i], this.path[i], i === this.path.length - 1)) {
         return false;
       }
     }
@@ -304,32 +424,27 @@ export default class Matcher {
   }
 
   /**
-   * Match path with deep wildcards
    * @private
    */
   _matchWithDeepWildcard(segments) {
-    let pathIdx = this.path.length - 1;  // Start from current node (bottom)
-    let segIdx = segments.length - 1;     // Start from last segment
+    let pathIdx = this.path.length - 1;
+    let segIdx = segments.length - 1;
 
     while (segIdx >= 0 && pathIdx >= 0) {
       const segment = segments[segIdx];
 
       if (segment.type === 'deep-wildcard') {
-        // ".." matches zero or more levels
         segIdx--;
 
         if (segIdx < 0) {
-          // Pattern ends with "..", always matches
           return true;
         }
 
-        // Find where next segment matches in the path
         const nextSeg = segments[segIdx];
         let found = false;
 
         for (let i = pathIdx; i >= 0; i--) {
-          const isCurrentNode = (i === this.path.length - 1);
-          if (this._matchSegment(nextSeg, this.path[i], isCurrentNode)) {
+          if (this._matchSegment(nextSeg, this.path[i], i === this.path.length - 1)) {
             pathIdx = i - 1;
             segIdx--;
             found = true;
@@ -341,9 +456,7 @@ export default class Matcher {
           return false;
         }
       } else {
-        // Regular segment
-        const isCurrentNode = (pathIdx === this.path.length - 1);
-        if (!this._matchSegment(segment, this.path[pathIdx], isCurrentNode)) {
+        if (!this._matchSegment(segment, this.path[pathIdx], pathIdx === this.path.length - 1)) {
           return false;
         }
         pathIdx--;
@@ -351,38 +464,25 @@ export default class Matcher {
       }
     }
 
-    // All segments must be consumed
     return segIdx < 0;
   }
 
   /**
-   * Match a single segment against a node
    * @private
-   * @param {Object} segment - Segment from Expression
-   * @param {Object} node - Node from path
-   * @param {boolean} isCurrentNode - Whether this is the current (last) node
-   * @returns {boolean}
    */
   _matchSegment(segment, node, isCurrentNode) {
-    // Match tag name (* is wildcard)
     if (segment.tag !== '*' && segment.tag !== node.tag) {
       return false;
     }
 
-    // Match namespace if specified in segment
     if (segment.namespace !== undefined) {
-      // Segment has namespace - node must match it
       if (segment.namespace !== '*' && segment.namespace !== node.namespace) {
         return false;
       }
     }
-    // If segment has no namespace, it matches nodes with or without namespace
 
-    // Match attribute name (check if node has this attribute)
-    // Can only check for current node since ancestors don't have values
     if (segment.attrName !== undefined) {
       if (!isCurrentNode) {
-        // Can't check attributes for ancestor nodes (values not stored)
         return false;
       }
 
@@ -390,20 +490,15 @@ export default class Matcher {
         return false;
       }
 
-      // Match attribute value (only possible for current node)
       if (segment.attrValue !== undefined) {
-        const actualValue = node.values[segment.attrName];
-        // Both should be strings
-        if (String(actualValue) !== String(segment.attrValue)) {
+        if (String(node.values[segment.attrName]) !== String(segment.attrValue)) {
           return false;
         }
       }
     }
 
-    // Match position (only for current node)
     if (segment.position !== undefined) {
       if (!isCurrentNode) {
-        // Can't check position for ancestor nodes
         return false;
       }
 
@@ -415,10 +510,8 @@ export default class Matcher {
         return false;
       } else if (segment.position === 'even' && counter % 2 !== 0) {
         return false;
-      } else if (segment.position === 'nth') {
-        if (counter !== segment.positionValue) {
-          return false;
-        }
+      } else if (segment.position === 'nth' && counter !== segment.positionValue) {
+        return false;
       }
     }
 
@@ -426,17 +519,17 @@ export default class Matcher {
   }
 
   /**
- * Match any expression in the given set against the current path.
- * @param {ExpressionSet} exprSet - The set of expressions to match against.
- * @returns {boolean} - True if any expression in the set matches the current path, false otherwise.
- */
+   * Match any expression in the given set against the current path.
+   * @param {ExpressionSet} exprSet
+   * @returns {boolean}
+   */
   matchesAny(exprSet) {
     return exprSet.matchesAny(this);
   }
 
   /**
-   * Create a snapshot of current state
-   * @returns {Object} State snapshot
+   * Create a snapshot of current state.
+   * @returns {Object}
    */
   snapshot() {
     return {
@@ -446,97 +539,32 @@ export default class Matcher {
   }
 
   /**
-   * Restore state from snapshot
-   * @param {Object} snapshot - State snapshot
+   * Restore state from snapshot.
+   * @param {Object} snapshot
    */
   restore(snapshot) {
-    //invalidate cache
     this._pathStringCache = null;
-    this._frozenPathCache = null;
-    this._frozenSiblingsCache = null;
     this.path = snapshot.path.map(node => ({ ...node }));
     this.siblingStacks = snapshot.siblingStacks.map(map => new Map(map));
   }
 
   /**
-   * Return a read-only view of this matcher.
+   * Return the read-only {@link MatcherView} for this matcher.
    *
-   * The returned object exposes all query/inspection methods but throws a
-   * TypeError if any state-mutating method is called (`push`, `pop`, `reset`,
-   * `updateCurrent`, `restore`).  Property reads (e.g. `.path`, `.separator`)
-   * are allowed but the returned arrays/objects are frozen so callers cannot
-   * mutate internal state through them either.
+   * The same instance is returned on every call — no allocation occurs.
+   * It always reflects the current parser state and is safe to pass to
+   * user callbacks without risk of accidental mutation.
    *
-   * @returns {ReadOnlyMatcher} A proxy that forwards read operations and blocks writes.
+   * @returns {MatcherView}
    *
    * @example
-   * const matcher = new Matcher();
-   * matcher.push("root", {});
-   *
-   * const ro = matcher.readOnly();
-   * ro.matches(expr);      // ✓ works
-   * ro.getCurrentTag();    // ✓ works
-   * ro.push("child", {}); // ✗ throws TypeError
-   * ro.reset();            // ✗ throws TypeError
+   * const view = matcher.readOnly();
+   * // pass view to callbacks — it stays in sync automatically
+   * view.matches(expr);       // ✓
+   * view.getCurrentTag();     // ✓
+   * // view.push(...)         // ✗ method does not exist — caught by TypeScript
    */
   readOnly() {
-    const self = this;
-
-    return new Proxy(self, {
-      get(target, prop, receiver) {
-        // Block mutating methods
-        if (MUTATING_METHODS.has(prop)) {
-          return () => {
-            throw new TypeError(
-              `Cannot call '${prop}' on a read-only Matcher. ` +
-              `Obtain a writable instance to mutate state.`
-            );
-          };
-        }
-
-        // Return cached frozen copy of path — rebuilt only after push/pop/updateCurrent/reset/restore
-        if (prop === 'path') {
-          if (target._frozenPathCache === null) {
-            target._frozenPathCache = Object.freeze(
-              target.path.map(node => Object.freeze({ ...node }))
-            );
-          }
-          return target._frozenPathCache;
-        }
-
-        // Return cached frozen copy of siblingStacks — rebuilt only after push/pop/reset/restore
-        if (prop === 'siblingStacks') {
-          if (target._frozenSiblingsCache === null) {
-            target._frozenSiblingsCache = Object.freeze(
-              target.siblingStacks.map(map => Object.freeze(new Map(map)))
-            );
-          }
-          return target._frozenSiblingsCache;
-        }
-
-        const value = Reflect.get(target, prop, receiver);
-
-        // Bind methods so `this` inside them still refers to the real Matcher
-        if (typeof value === 'function') {
-          return value.bind(target);
-        }
-
-        return value;
-      },
-
-      // Prevent any property assignment on the read-only view
-      set(_target, prop) {
-        throw new TypeError(
-          `Cannot set property '${String(prop)}' on a read-only Matcher.`
-        );
-      },
-
-      // Prevent property deletion
-      deleteProperty(_target, prop) {
-        throw new TypeError(
-          `Cannot delete property '${String(prop)}' from a read-only Matcher.`
-        );
-      }
-    });
+    return this._view;
   }
 }

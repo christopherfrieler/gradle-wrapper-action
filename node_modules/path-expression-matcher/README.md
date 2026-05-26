@@ -4,10 +4,11 @@ Efficient path tracking and pattern matching for XML, JSON, YAML or any other pa
 
 ## 🎯 Purpose
 
-`path-expression-matcher` provides two core classes for tracking and matching paths:
+`path-expression-matcher` provides three core classes for tracking and matching paths:
 
 - **`Expression`**: Parses and stores pattern expressions (e.g., `"root.users.user[id]"`)
 - **`Matcher`**: Tracks current path during parsing and matches against expressions
+- **`MatcherView`**: A lightweight read-only view of a `Matcher`, safe to pass to callbacks
 
 Compatible with [fast-xml-parser](https://github.com/NaturalIntelligence/fast-xml-parser) and similar tools.
 
@@ -368,51 +369,51 @@ matcher.restore(snapshot);
 
 ##### `readOnly()`
 
-Returns a **live, read-only proxy** of the matcher. All query and inspection methods work normally, but any attempt to call a state-mutating method (`push`, `pop`, `reset`, `updateCurrent`, `restore`) or to write/delete a property throws a `TypeError`.
+Returns a **`MatcherView`** — a lightweight, live read-only view of the matcher. All query and inspection methods work normally and always reflect the current state of the underlying matcher. Mutation methods (`push`, `pop`, `reset`, `updateCurrent`, `restore`) simply don't exist on `MatcherView`, so misuse is caught at **compile time** by TypeScript rather than at runtime.
 
-This is the recommended way to share the matcher with external consumers — plugins, callbacks, event handlers — that only need to inspect the current path without being able to corrupt parser state.
-
-```javascript
-const ro = matcher.readOnly();
-```
-
-**What works on the read-only view:**
+The **same instance** is returned on every call — no allocation occurs per invocation. This is the recommended way to share the matcher with callbacks, plugins, or any external code that only needs to inspect the current path.
 
 ```javascript
-ro.matches(expr)          // ✓ pattern matching
-ro.getCurrentTag()        // ✓ current tag name
-ro.getCurrentNamespace()  // ✓ current namespace
-ro.getAttrValue("id")     // ✓ attribute value
-ro.hasAttr("id")          // ✓ attribute presence check
-ro.getPosition()          // ✓ sibling position
-ro.getCounter()           // ✓ occurrence counter
-ro.getDepth()             // ✓ path depth
-ro.toString()             // ✓ path as string
-ro.toArray()              // ✓ path as array
-ro.snapshot()             // ✓ snapshot (can be used to restore the real matcher)
+const view = matcher.readOnly();
+// Same reference every time — safe to cache
+view === matcher.readOnly(); // true
 ```
 
-**What throws a `TypeError`:**
+**What works on the view:**
 
 ```javascript
-ro.push("child", {})      // ✗ TypeError: Cannot call 'push' on a read-only Matcher
-ro.pop()                  // ✗ TypeError: Cannot call 'pop' on a read-only Matcher
-ro.reset()                // ✗ TypeError: Cannot call 'reset' on a read-only Matcher
-ro.updateCurrent({})      // ✗ TypeError: Cannot call 'updateCurrent' on a read-only Matcher
-ro.restore(snapshot)      // ✗ TypeError: Cannot call 'restore' on a read-only Matcher
-ro.separator = '/'        // ✗ TypeError: Cannot set property on a read-only Matcher
+view.matches(expr)          // ✓ pattern matching
+view.getCurrentTag()        // ✓ current tag name
+view.getCurrentNamespace()  // ✓ current namespace
+view.getAttrValue("id")     // ✓ attribute value
+view.hasAttr("id")          // ✓ attribute presence check
+view.getPosition()          // ✓ sibling position
+view.getCounter()           // ✓ occurrence counter
+view.getDepth()             // ✓ path depth
+view.toString()             // ✓ path as string
+view.toArray()              // ✓ path as array
 ```
 
-**Important:** The read-only view is **live** — it always reflects the current state of the underlying matcher. If you need a frozen-in-time copy instead, use `snapshot()`.
+**What doesn't exist (compile-time error in TypeScript):**
+
+```javascript
+view.push("child", {})      // ✗ Property 'push' does not exist on type 'MatcherView'
+view.pop()                  // ✗ Property 'pop' does not exist on type 'MatcherView'
+view.reset()                // ✗ Property 'reset' does not exist on type 'MatcherView'
+view.updateCurrent({})      // ✗ Property 'updateCurrent' does not exist on type 'MatcherView'
+view.restore(snapshot)      // ✗ Property 'restore' does not exist on type 'MatcherView'
+```
+
+**The view is live** — it always reflects the current state of the underlying matcher.
 
 ```javascript
 const matcher = new Matcher();
-const ro = matcher.readOnly();
+const view = matcher.readOnly();
 
 matcher.push("root");
-ro.getDepth();    // 1 — immediately reflects the push
+view.getDepth();    // 1 — immediately reflects the push
 matcher.push("users");
-ro.getDepth();    // 2 — still live
+view.getDepth();    // 2 — still live
 ```
 
 ## 💡 Usage Examples
@@ -550,9 +551,9 @@ const expr = new Expression("root.item:first");
 console.log(matcher.matches(expr)); // false (counter=1, not 0)
 ```
 
-### Example 8: Passing a Read-Only Matcher to External Consumers
+### Example 8: Passing a Read-Only View to External Consumers
 
-When passing the matcher into callbacks, plugins, or other code you don't control, use `readOnly()` to prevent accidental state corruption.
+When passing the matcher into callbacks, plugins, or other code you don't control, use `readOnly()` to get a `MatcherView` — it can inspect but never mutate parser state.
 
 ```javascript
 import { Expression, Matcher } from 'path-expression-matcher';
@@ -564,38 +565,24 @@ const adminExpr = new Expression("..user[type=admin]");
 function parseTag(tagName, attrs, onTag) {
   matcher.push(tagName, attrs);
 
-  // Pass a read-only view — consumer can inspect but not mutate
+  // Pass MatcherView — consumer can inspect but not mutate
   onTag(matcher.readOnly());
 
   matcher.pop();
 }
 
 // Safe consumer — can only read
-function myPlugin(ro) {
-  if (ro.matches(adminExpr)) {
-    console.log("Admin at path:", ro.toString());
-    console.log("Depth:", ro.getDepth());
-    console.log("ID:", ro.getAttrValue("id"));
+function myPlugin(view) {
+  if (view.matches(adminExpr)) {
+    console.log("Admin at path:", view.toString());
+    console.log("Depth:", view.getDepth());
+    console.log("ID:", view.getAttrValue("id"));
   }
 }
 
-// ro.push(...) or ro.reset() here would throw TypeError,
-// so the parser's state is always safe.
+// view.push(...) or view.reset() don't exist on MatcherView —
+// TypeScript catches misuse at compile time.
 parseTag("user", { id: "1", type: "admin" }, myPlugin);
-```
-
-**Combining with `snapshot()`:** A snapshot taken via the read-only view can still be used to restore the real matcher.
-
-```javascript
-const matcher = new Matcher();
-matcher.push("root");
-matcher.push("users");
-
-const ro = matcher.readOnly();
-const snap = ro.snapshot();       // ✓ snapshot works on read-only view
-
-matcher.push("user");             // continue parsing...
-matcher.restore(snap);            // restore to "root.users" using the snapshot
 ```
 
 ```javascript
@@ -799,7 +786,7 @@ Whether `seal()` has been called.
 ### `matchesAny(matcher)` → `boolean`
 
 Returns `true` if the matcher's current path matches **any** expression in the set.
-Accepts both a `Matcher` instance and a `ReadOnlyMatcher` view.
+Accepts both a `Matcher` instance and a `MatcherView`.
 
 ```javascript
 if (stopNodes.matchesAny(matcher)) { /* ... */ }
@@ -818,7 +805,7 @@ In practice, deep-wildcard expressions are rare in configs, so the list stays sm
 
 ### `findMatch(matcher)` → `Expression`
 
-Returns the Expression instance that matched the current path. Accepts both a `Matcher` instance and a `ReadOnlyMatcher` view.
+Returns the Expression instance that matched the current path. Accepts both a `Matcher` instance and a `MatcherView`.
 
 ```javascript
 const node = stopNodes.findMatch(matcher);
@@ -882,4 +869,4 @@ MIT
 
 ## 🤝 Contributing
 
-Issues and PRs welcome! This package is designed to be used by XML/JSON parsers like fast-xml-parser.
+Issues and PRs welcome! This package is designed to be used by XML/JSON parsers like fast-xml-parser. But can be used with any formar parser.
