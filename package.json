@@ -26,8 +26,8 @@
   "dependencies": {
     "@actions/core": "3.0",
     "@actions/exec": "3.0",
-    "@actions/artifact": "6.2",
+    "@actions/artifact": "6.3",
     "@actions/glob": "0.7",
-    "@actions/cache": "6.2"
+    "@actions/cache": "6.3"
   }
 }
