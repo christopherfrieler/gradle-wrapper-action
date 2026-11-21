@@ -40,7 +40,7 @@ You can specify multiple artifacts declaring one per line.
 ### Example
 
 ```yaml
-- uses: actions/setup-java@v5  # setup java for Gradle execution
+- uses: actions/setup-java@v6  # setup java for Gradle execution
 - name: gradle execution  
   uses: christopherfrieler/gradle-wrapper-action@v0.7.6
   with:
